@@ -323,6 +323,7 @@ tfoot td{border:0;font-weight:700;font-size:1.05rem;padding-top:12px}
         <div class="seg" id="camViews" hidden><button data-act="cam" data-v="front">Frente</button><button data-act="cam" data-v="persp">3/4</button><button data-act="cam" data-v="left">Lateral</button></div>
         <button class="btn" data-act="open" id="openBtn" hidden>Abrir puertas</button>
         <button class="btn night" data-act="night" id="nightBtn" hidden aria-pressed="false">Modo noche</button>
+        <button class="btn" data-act="lite" id="liteBtn" aria-pressed="false" title="Menos calidad gráfica para que vaya fluido en ordenadores lentos">Bajo consumo</button>
         <button class="btn primary push" data-act="add" id="addBtn">+ Añadir módulo</button>
       </div>
       <div class="slidebar" id="slidebar" hidden></div>
@@ -439,6 +440,10 @@ let state={step:0,room:{on:false,w:240,h:250,lw:150},apertura:'abatible',slideFi
 ]};
 try{const s=JSON.parse(localStorage.getItem('armario-v5'));if(s&&s.mods&&s.mods.length)state=s;}catch(e){}
 state.hq=false;if(state.room)state.room.on=false;if(!state.step||state.step>1)state.step=0;
+if(state.lite===undefined){const c=navigator.hardwareConcurrency||8,m=navigator.deviceMemory||8;state.lite=c<=4||m<=4;}
+const PR=()=>state.lite?Math.min(1,devicePixelRatio)*.75:Math.min(2,devicePixelRatio);
+function applyLite(){if(G){G.renderer.setPixelRatio(PR());G.sun.castShadow=!state.lite;const w=G.host.clientWidth,h=G.host.clientHeight;if(w)G.renderer.setSize(w,h);resizeComp();G.dirty=3;}
+  if(HP){HP.r.setPixelRatio(PR());const w=HP.host.clientWidth,h=HP.host.clientHeight;if(w)HP.r.setSize(w,h);HP.once=0;}}
 const save=()=>{try{localStorage.setItem('armario-v5',JSON.stringify(state))}catch(e){}};
 
 /* ===================== REGLAS ===================== */
@@ -930,7 +935,7 @@ function render(){
   const is3d=state.view==='3d', ob=document.getElementById('openBtn');
   ob.hidden=!is3d; ob.textContent=state.open?'Cerrar puertas':'Abrir puertas';
   state.hq=false;
-  const nb=document.getElementById('nightBtn');nb.hidden=!is3d;nb.textContent=state.night?'Modo día':'Modo noche';nb.setAttribute('aria-pressed',!!state.night);
+  const nb=document.getElementById('nightBtn');nb.hidden=!is3d;{const lb=document.getElementById('liteBtn');lb.setAttribute('aria-pressed',!!state.lite);lb.textContent=state.lite?'Bajo consumo ✓':'Bajo consumo';}nb.textContent=state.night?'Modo día':'Modo noche';nb.setAttribute('aria-pressed',!!state.night);
   document.getElementById('canvas').hidden=is3d;
   document.getElementById('canvas3d').hidden=!is3d;
   document.getElementById('hint').textContent=is3d
@@ -1050,7 +1055,7 @@ function ensure3D(){
   if(!window.THREE||!THREE.OrbitControls){host.innerHTML='<p class="err">No se ha podido cargar la vista 3D. Recarga la página.</p>';return false;}
   if(!M.blanco)initMats();
   const renderer=new THREE.WebGLRenderer({antialias:true});
-  renderer.setPixelRatio(Math.min(2,devicePixelRatio));
+  renderer.setPixelRatio(PR());
   renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.8;
   renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   host.appendChild(renderer.domElement);
@@ -1069,7 +1074,7 @@ function ensure3D(){
   controls.enableDamping=true;controls.maxPolarAngle=Math.PI/2-.05;controls.minDistance=60;controls.maxDistance=1300;
   controls.minAzimuthAngle=-1.3;controls.maxAzimuthAngle=1.3;
   const hemi=new THREE.HemisphereLight(0xffffff,0xb0a89c,.35);scene.add(hemi);
-  const sun=new THREE.DirectionalLight(0xfff6ea,1.15);sun.castShadow=true;sun.shadow.mapSize.set(4096,4096);
+  const sun=new THREE.DirectionalLight(0xfff6ea,1.15);sun.castShadow=!state.lite;sun.shadow.mapSize.set(4096,4096);
   Object.assign(sun.shadow.camera,{left:-450,right:450,top:450,bottom:-100,near:1,far:1600});
   sun.shadow.bias=-.0006;sun.shadow.normalBias=.8;scene.add(sun,sun.target);
   const pl=new THREE.PointLight(0xfff3e4,.28,0,0);pl.position.set(0,150,260);scene.add(pl);
@@ -1103,7 +1108,7 @@ function ensure3D(){
     let mv=0;G.doors.forEach(p=>{const u=p.userData;let d;if(u.kind==='pull'){const t=state.open?u.out:0;d=t-p.position.z;p.position.z+=d*.1;}else if(u.kind==='slide'){const t=u.base+(state.open?u.slide:0);d=t-p.position.x;p.position.x+=d*.12;}else{const t=state.open?u.open:0;d=(t-p.rotation.y)*30;p.rotation.y+=(t-p.rotation.y)*.12;}if(Math.abs(d)>.02)mv=1;});
     if(controls.update())mv=1;if(mv)G.dirty=Math.max(G.dirty||0,2);
     if(!G.dirty)return;G.dirty--;
-    if(state.hq!==false&&G.comp)G.comp.c.render();else renderer.render(scene,camera);
+    if(state.hq!==false&&!state.lite&&G.comp)G.comp.c.render();else renderer.render(scene,camera);
   })();
   return true;
 }
@@ -1351,7 +1356,7 @@ function thumbFor(model,fin){
 }
 function previewInit(){
   const host=document.getElementById('hprev');if(HP||!host||!mats3D())return !!HP;
-  const r=new THREE.WebGLRenderer({antialias:true});r.setPixelRatio(Math.min(2,devicePixelRatio));
+  const r=new THREE.WebGLRenderer({antialias:true});r.setPixelRatio(PR());
   r.outputEncoding=THREE.sRGBEncoding;r.toneMapping=THREE.ACESFilmicToneMapping;r.toneMappingExposure=1.05;r.shadowMap.enabled=true;r.shadowMap.type=THREE.PCFSoftShadowMap;
   host.appendChild(r.domElement);
   const sc=new THREE.Scene();sc.background=new THREE.Color('#e4e2dd').convertSRGBToLinear();sc.environment=makeEnv(r);
@@ -1367,12 +1372,12 @@ function previewInit(){
   new ResizeObserver(size).observe(host);size();
   new IntersectionObserver(es=>{HP.vis=es[0].isIntersecting;}).observe(host);
   let idle=0;r.domElement.addEventListener('pointerdown',()=>idle=-240);
-  (function loop(){requestAnimationFrame(loop);if(!HP.vis)return;HP.t+=.01;idle++;
+  (function loop(){requestAnimationFrame(loop);if(!HP.vis)return;idle++;if(state.lite&&idle>0){if(HP.once)return;HP.once=1;g.rotation.y=.2;ctl.update();r.render(sc,cam);return;}HP.t+=.01;
     if(idle>0)g.rotation.y=Math.sin(HP.t)*.32;ctl.update();r.render(sc,cam);})();
   return true;
 }
 function previewBuild(){
-  if(!previewInit())return;
+  if(!previewInit())return;HP.once=0;
   const g=HP.g;g.children.slice().forEach(c=>{g.remove(c);c.traverse(o=>o.geometry&&o.geometry.dispose());});
   const m=state.mods[state.sel],f=m.finish&&m.finish!=='none'&&m.finish!=='samara'&&m.finish!=='espejo'?m.finish:'riga_blanca';
   const vh=state.handle.orient!=='h';
@@ -1831,6 +1836,7 @@ document.addEventListener('click',e=>{
     case 'sprof':state.slideProf=v;break;
     case 'open':state.open=!state.open;break;
     case 'night':state.night=!state.night;break;
+    case 'lite':state.lite=!state.lite;applyLite();toast(state.lite?'Bajo consumo activado: menos calidad, más fluido.':'Calidad alta activada.');break;
     case 'add':{const n=newMod({w:m.w===40&&!isR(m)?40:60,h:isR(m)?204.8:m.h,d:m.d,color:m.color,base:m.base,finish:m.finish,items:['balda','barra']});
       if(!modOK(n.w,n.h,n.d))setDim(n,'h',n.h);state.mods.push(n);state.sel=state.mods.length-1;state.selItem=-1;break;}
     case 'type':if(v==='rincon'){if(rIdx()>=0&&!isR(m))return;m.type='rincon';m.items=['balda','barra','balda'];m.custom=false;
