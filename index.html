@@ -189,6 +189,7 @@ body.dragging,body.dragging *{cursor:grabbing!important;user-select:none}
 .afix span{flex:1;min-width:0}.afix b{display:block;font-size:.86rem;font-weight:600}.afix small{font-size:.76rem;color:#7a5a3a}
 .afix em{font-style:normal;font-weight:700;font-size:.8rem;color:var(--accent);white-space:nowrap}
 .afix.alt{background:transparent}
+.dguide{border:1px solid var(--line);border-radius:4px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}.dguide summary{cursor:pointer;font-weight:600;font-size:.92rem}.dguide .afixes{margin-top:8px}.dguide .afix{border-color:var(--line)}.dguide .afix.cur{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}.dguide .gstat{font-size:.84rem;margin:6px 0 0}.dguide .gstat.ok{color:var(--accent)}.dguide .gstat.ko{color:#c2410c}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .assist{background:#2a1d12;border-color:#7a4a22;color:#f3e3d2}:root:not([data-theme="light"]) .afix{background:#1d1712;color:#f3e3d2;border-color:#5b3a1e}:root:not([data-theme="light"]) .ahead small,:root:not([data-theme="light"]) .afix small{color:#d6b38f}}
 .tircard{padding:16px;display:flex;flex-direction:column;gap:14px}
 .tgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:22px;align-items:start}
@@ -822,6 +823,39 @@ function assistHTML(m){
       <button class="afix alt" data-act="dfix" data-v="open"><span><b>Dejarlo sin puerta arriba</b><small>Queda un hueco abierto de ${cm(dp.R)} cm</small></span><em>Vale así</em></button></div></div>`;
 }
 
+/* ===================== GUÍA DE CAJONES EXTERIORES ===================== */
+let GUIDE=[];
+const baseTxt=b=>({suelo:'sin zócalo',zocalo:'con zócalo',patas:'con patas'})[b];
+function drawerGuide(m,i){
+  if(isR(m)||!ITEMS.cajon_ext.ok(m))return [];
+  const lock=i>=0&&isL80(i),others=m.items.filter(t=>t!=='cajon_ext'),out=[];
+  (lock?[m.h]:HS.filter(h=>modOK(m.w,h,m.d))).forEach(h=>{
+    const bases=lock?[m.base]:(m.base==='patas'?['patas']:(h>=204.8?['suelo','zocalo']:['suelo']));
+    bases.forEach(base=>{for(let n=1;n<=8;n++){
+      const R=Math.round((h-(base==='zocalo'?Z:0)-n*FD)*10)/10;if(R<-.05)break;
+      if(!(R<.2||HS.some(x=>Math.abs(x-R)<.1)))continue;
+      const t={...m,h,base,items:[...Array(n).fill('cajon_ext'),...others],doorH:null,split:false};let drop=0;
+      while(used(t)>avail(t)+.01&&t.items.length>n){t.items.pop();drop++;}
+      if(used(t)>avail(t)+.01||!itemsValid(t))continue;
+      t.finish=m.finish==='none'||finOK(m.finish,t)?m.finish:'riga_blanca';
+      const dp=doorPlan(t),res=R<.2?'Todo cajones, sin puerta':m.finish==='none'?`Hueco de ${cm(R)} cm para una puerta de ${cm(DOOR_H[HS.find(x=>Math.abs(x-R)<.1)])}`:`Puerta de ${dp.stack.map(q=>cm(q.h)).join(' + ')} cm encima`;
+      const parts=[];if(h!==m.h)parts.push(`módulo de ${cm(h)}`);if(base!==m.base)parts.push(baseTxt(base));if(drop)parts.push(`quita ${drop} elemento${drop>1?'s':''} de arriba`);if(t.finish!==m.finish)parts.push('puerta Riga blanca');
+      out.push({t:{h,base,items:t.items,finish:t.finish,doorH:null,split:false},n,h,base,res,extra:parts.join(' · '),cur:h===m.h&&base===m.base&&n===nExt(m),
+        score:(h!==m.h?3:0)+(base!==m.base?1:0)+drop*1.5+Math.abs(n-nExt(m))*.4});}});});
+  return out.sort((a,b)=>a.score-b.score);
+}
+function guideHTML(m,i){
+  if(isR(m))return '';
+  if(!ITEMS.cajon_ext.ok(m))return `<details class="dguide"><summary>Guía de cajones exteriores</summary><p class="mini">${state.apertura==='corredera'?'Con puertas correderas no se pueden poner cajones exteriores.':'Los cajones exteriores solo van en módulos de 60 u 80 de ancho y fondo 38 o 54.'}</p></details>`;
+  GUIDE=drawerGuide(m,i);const n=nExt(m),dp=doorPlan(m);
+  const ok=n&&(!dp.open||dp.full),stat=!n?'':ok?`<p class="gstat ok">✓ Ahora: ${n} cajón${n>1?'es':''} y ${dp.full?'ningún hueco':'la puerta encaja justa'}.</p>`:`<p class="gstat ko">✗ Ahora: ${n} cajón${n>1?'es':''} y quedan ${cm(dp.R)} cm encima, que no es una medida de puerta.</p>`;
+  return `<details class="dguide" ${n?'open':''}><summary>Guía de cajones exteriores · cuántos poner para que la puerta encaje</summary>
+    <p class="mini">Cada cajón exterior mide 25,6 cm de alto${m.base==='zocalo'?' y el zócalo 9,6 cm':''}. La puerta de arriba solo encaja justa si el hueco que queda mide 38,4 · 102,4 · 204,8 o 230,4 cm. Estas son las combinaciones que encajan perfectas con un módulo de ${m.w} de ancho y fondo ${m.d}:${m.base==='zocalo'&&!GUIDE.some(g=>g.base==='zocalo')?' Con zócalo no encaja ninguna: hay que quitarlo.':''}</p>${stat}
+    <div class="afixes">${GUIDE.length?GUIDE.map((g,k)=>{const t={...m,...g.t};
+      return `<button class="afix${g.cur?' cur':''}" data-act="dguide" data-v="${k}"><svg viewBox="-1 -1 ${m.w+2} ${g.h+2}" aria-hidden="true">${faceSVG(t,0,-1,'puertas')}</svg>
+        <span><b>${g.n} cajón${g.n>1?'es':''} · módulo ${cm(g.h)} ${baseTxt(g.base)}</b><small>${g.res}${g.extra&&!g.cur?' · cambia: '+g.extra:''}</small></span><em>${g.cur?'Tu módulo':'Aplicar'}</em></button>`;}).join(''):'<p class="mini">Con este ancho y fondo no hay ninguna combinación de cajones con la que la puerta encaje justa.</p>'}</div></details>`;
+}
+
 /* ===================== PANEL DEL MÓDULO ===================== */
 const seg=(act,opts,cur)=>`<div class="seg">${opts.map(([v,l,dis,tt])=>`<button data-act="${act}" data-v="${v}" aria-pressed="${String(v)===String(cur)}" ${dis?'disabled':''} ${tt?`title="${tt}"`:''}>${l}</button>`).join('')}</div>`;
 function notesFor(m,i){
@@ -865,9 +899,9 @@ function renderPanel(){
       return `<div class="field"><span class="tlabel">Altura de la puerta · hueco de ${cm(R)} cm</span>${seg('dcover',opts,cur)}
         ${m.doorH&&m.doorH<R-.1?`<div class="srow"><span>La puerta va</span>${seg('dpos',[['top','Arriba'],['bottom','Abajo']],m.doorPos==='bottom'?'bottom':'top')}<small class="mini">El resto (${cm(R-m.doorH)} cm) queda abierto.</small></div>`:''}</div>`;})():''}
   </div>`}
+  ${guideHTML(m,i)}
   ${canTop(m,i)?`<div class="field"><span class="tlabel">Altillo encima · módulo ${m.w} × 38,4 × 54${m.top?` · total ${cm(m.h+TOPH)} cm`:''}</span>${seg('top',[['no','Sin altillo'],['si','Con altillo']],m.top?'si':'no')}
     ${m.top?`<div class="srow"><span>Puerta del altillo</span>${seg('tfin',[['none','Sin puerta']].concat(Object.keys(FIN).filter(f=>!FIN[f].hs||FIN[f].hs.includes(TOPH)).map(f=>[f,FIN[f].name])),m.top.finish||'none')}</div><small class="mini">El altillo va atornillado encima del módulo y lleva su propia puerta${m.w===80?' (2 puertas de 39,7 × 38,1)':` de ${m.w===60?'59,7':'39,7'} × 38,1`}.</small>`:''}</div>`:''}
-  ${m.ackOpen?'':assistHTML(m)}
   ${m.items.includes('cajon_ext')?`<div class="field"><span class="tlabel">Frente de cajón exterior</span><div class="chips">${DRAWER_FIN.map(f=>`<button class="fchip" data-act="dfin" data-v="${f}" aria-pressed="${m.dfin===f}"><span style="background:${finFill(f).startsWith('url')?'#c69a69':finFill(f)}"></span>${FIN[f].name}</button>`).join('')}</div></div>`:''}
   ${m.items.includes('cajon_int')?`<div class="field"><span class="tlabel">Frente de cajón interior</span>${seg('ifront',Object.entries(IFRONT),m.ifront)}</div>`:''}
   ${!isR(m)&&m.d!==28?`<div class="field"><span class="tlabel">Paneles laterales de acabado</span>${seg('panel',[['l','Izquierdo'],['r','Derecho']].map(([k,l])=>[k,l]),'')}</div>`.replace(/aria-pressed="false"/g,'').replace(/data-v="l"/,`data-v="l" aria-pressed="${!!m.panels.l}"`).replace(/data-v="r"/,`data-v="r" aria-pressed="${!!m.panels.r}"`):''}
@@ -1894,6 +1928,7 @@ document.addEventListener('click',e=>{
     case 'wpos':room().pos=v;break;
     case 'dcover':m.ackOpen=false;if(v==='full'){m.doorH=null;m.split=false;}else if(v==='split'){m.doorH=null;m.split=true;}else{m.doorH=+v.slice(1);m.split=false;if(!m.doorPos)m.doorPos='top';}break;
     case 'dpos':m.doorPos=v;break;
+    case 'dguide':{const g=GUIDE[+v];if(g&&!g.cur){Object.assign(m,g.t,{items:[...g.t.items]});m.ackOpen=false;toast(`Listo: ${g.n} cajón${g.n>1?'es':''}, módulo de ${cm(g.h)} ${baseTxt(g.base)}. ${g.res}.`);}break;}
     case 'dfix':if(v==='open'){m.ackOpen=true;}else{const f=FIXES[+v];if(f){Object.assign(m,{h:f.t.h,base:f.t.base,finish:f.t.finish,items:[...f.t.items],doorH:f.t.doorH||null,doorPos:f.t.doorPos||m.doorPos});m.ackOpen=false;toast('Listo: '+f.txt+'. Puerta de '+f.res+' cm.');}}break;
     case 'isel':state.selItem=state.selItem===+v?-1:+v;break;
     case 'iadd':{if(!fits(m,v))return;if(v==='cajon_ext')m.ackOpen=false;
