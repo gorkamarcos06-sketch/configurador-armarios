@@ -1152,6 +1152,7 @@ function ensure3D(){
     if(state.view!=='3d')return;
     let mv=0;G.doors.forEach(p=>{const u=p.userData;let d;if(u.kind==='pull'){const t=state.open?u.out:0;d=t-p.position.z;p.position.z+=d*.1;}else if(u.kind==='slide'){const t=u.base+(state.open?u.slide:0);d=t-p.position.x;p.position.x+=d*.12;}else{const t=state.open?u.open:0;d=(t-p.rotation.y)*30;p.rotation.y+=(t-p.rotation.y)*.12;}if(Math.abs(d)>.02)mv=1;});
     if(controls.update())mv=1;if(mv)G.dirty=Math.max(G.dirty||0,2);
+    if(G.roomX){const x=camera.position.x;G.left.visible=x>G.roomX[0]+5;G.right.visible=x<G.roomX[1]-5;}
     if(!G.dirty)return;G.dirty--;
     if(state.hq!==false&&!state.lite&&G.comp)G.comp.c.render();else renderer.render(scene,camera);
   })();
@@ -1360,8 +1361,11 @@ function build3D(){
   };
   G.groups=[];state.mods.forEach(place);
   {const P0=state.place||{},noR=c<0;G.root.position.set(noR&&!RM.on?(P0.dx||0):0,0,noR?(P0.dz||0):0);}
+  /* habitación cerrada tipo IKEA: pared izquierda y derecha fijas; el armario se mueve dentro */
+  {let L,Rr;if(c>=0){L=XL;Rr=XL+a+170;}else{const hw=Math.max(a/2+150,200);L=-hw;Rr=hw;const lim=hw-a/2-4;G.root.position.x=Math.max(-lim,Math.min(lim,G.root.position.x));}
+   G.left.position.x=L;G.right.position.x=Rr;G.left.visible=G.right.visible=true;G.roomX=[L,Rr];}
   if(state.deco!==false)deco3D();
-  if(G.win)G.win.visible=state.deco!==false&&G.left.visible;
+  if(G.win)G.win.visible=state.deco!==false;
   applyNight();dims3D();G.dirty=4;
   if(!G.fitted){G.fitted=true;camView('persp');}
 }
@@ -1394,12 +1398,12 @@ function deco3D(){
   const cx=(box.min.x+box.max.x)/2,rw=Math.min(200,Math.max(140,(box.max.x-box.min.x)*.75));
   const rug=new THREE.Mesh(new THREE.BoxGeometry(rw,.8,rw*1.4),[M.rug,M.rug,M.rug,M.rug,M.rug,M.rug]);rug.position.set(cx,.4,box.max.z+40+rw*.7);rug.receiveShadow=true;dg.add(rug);
   /* planta a la derecha */
-  const px=box.max.x+32,pz=Math.min(30,box.max.z-20),pot=sh(new THREE.Mesh(new THREE.CylinderGeometry(15,11,34,32),M.pot));pot.position.set(px,17,pz);dg.add(pot);
+  const [RL,RR]=(G.roomX||[-1e4,1e4]).map(v=>v-root.position.x),rightOK=box.max.x+50<RR,px=rightOK?box.max.x+32:box.min.x-32,pz=Math.min(30,box.max.z-20),pot=sh(new THREE.Mesh(new THREE.CylinderGeometry(15,11,34,32),M.pot));pot.position.set(px,17,pz);dg.add(pot);
   const soil=new THREE.Mesh(new THREE.CylinderGeometry(14,14,1,24),M.soil);soil.position.set(px,32.6,pz);dg.add(soil);
   const r=rng(7);for(let k=0;k<16;k++){const h=45+r()*55,lf=sh(new THREE.Mesh(new THREE.ConeGeometry(4.6,h,5,1),k%2?M.leafA:M.leafB));
     lf.scale.z=.18;const a=r()*Math.PI*2,d=2+r()*8;lf.position.set(px+Math.cos(a)*d,33+h/2,pz+Math.sin(a)*d);lf.rotation.set(Math.sin(a)*.18*(d/7+.3),r()*Math.PI,Math.cos(a)*.18*(d/7+.3));dg.add(lf);}
   /* cuadro en la pared del fondo */
-  const fx=box.max.x+48;const fr=sh(new THREE.Mesh(new THREE.BoxGeometry(54,74,2.4),M.frame));fr.position.set(fx,168,1.3);dg.add(fr);
+  const fx=rightOK?Math.min(box.max.x+48,RR-34):Math.max(box.min.x-48,RL+34);const fr=sh(new THREE.Mesh(new THREE.BoxGeometry(54,74,2.4),M.frame));fr.position.set(fx,168,1.3);dg.add(fr);
   const pa=new THREE.Mesh(new THREE.PlaneGeometry(48,68),M.art);pa.position.set(fx,168,2.55);dg.add(pa);
   root.add(dg);
   /* ventana en la pared izquierda (si se ve) */
@@ -1410,7 +1414,7 @@ function deco3D(){
     [[-61],[61]].forEach(([z])=>{const b=new THREE.Mesh(new THREE.BoxGeometry(5,146,4),fm);b.position.set(.5,0,z);w.add(b);});
     const v=new THREE.Mesh(new THREE.BoxGeometry(5,140,3),fm);v.position.set(.5,0,0);w.add(v);
     const sill=new THREE.Mesh(new THREE.BoxGeometry(14,2.5,132),fm);sill.position.set(5,-73,0);w.add(sill);
-    w.position.set(-1.6,150,250);G.left.add(w);G.win=w;}
+    w.rotation.y=Math.PI;w.position.set(1.6,150,260);G.right.add(w);G.win=w;}
 }
 
 /* ===================== APARTADO DE TIRADORES ===================== */
