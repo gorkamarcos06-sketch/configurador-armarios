@@ -449,6 +449,12 @@ const save=()=>{try{localStorage.setItem('armario-v5',JSON.stringify(state))}cat
 /* ===================== REGLAS ===================== */
 const zH=m=>m.base==='zocalo'?Z:0;
 const lift=m=>m.base==='patas'?LEG:0;
+/* altillo: módulo de 38,4 encima de un módulo de 204,8 o 230,4 de fondo 54, con su propia puerta */
+const canTop=(m,i)=>!isR(m)&&!m.alt&&m.d===54&&m.h>=204.8&&!(i>=0&&isL80(i));
+const hasTop=(m,i=state.mods.indexOf(m))=>!!(m.top&&canTop(m,i));
+const TOPH=38.4;
+const fullH=m=>m.h+(hasTop(m)?TOPH:0);
+function altMod(m){return {type:'normal',alt:true,w:m.w,h:TOPH,d:54,color:m.color,base:'suelo',finish:m.top.finish||'none',dfin:m.dfin,ifront:m.ifront,items:[],custom:false,leds:{},panels:{},split:false,doorH:null};}
 const nExt=m=>m.items.filter(t=>t==='cajon_ext').length;
 const extH=m=>nExt(m)*FD;
 const avail=m=>m.h-zH(m)-2*T;
@@ -475,7 +481,7 @@ function zones(m){
 }
 /* puertas abatibles: pila de puertas de altura estándar por encima de los cajones exteriores */
 function doorPlan(m){
-  if(state.apertura==='corredera'&&!isR(m))return {stack:[],slide:true,n:1,lw:m.w+.5};
+  if(state.apertura==='corredera'&&!isR(m)&&!m.alt)return {stack:[],slide:true,n:1,lw:m.w+.5};
   if(m.finish==='none')return {stack:[],n:0};
   if(isR(m))return {stack:[{y:0,h:DOOR_H[m.h],mh:m.h}],n:1,lw:39.7};
   const ne=nExt(m),y0=ne?zH(m)+ne*FD:0,R=Math.round((m.h-y0)*10)/10;let stack=[];
@@ -598,14 +604,15 @@ function bom(mods,lots=true){
   const rows=[],add=(g,name,q,u,ref)=>{if(q<=0)return;if(u&&typeof u==='object'){ref=u.ref;u=u.u;}const r=rows.find(r=>r.g===g&&r.name===name&&r.u===r2(u));if(r)r.q+=q;else rows.push({g,name,q,u:r2(u),ref:ref||null});};
   const X=(k,fb)=>lm(k,fb);
   const shelves={};let nHandleDoors=0,nHandleDrawers=0,nPush=0,ledConv=false;
-  mods.forEach(m=>{
-    const i=state.mods.indexOf(m),k=m.color==='roble'?P.roble:1,col=m.color==='roble'?'efecto roble':'blanco';
+  const list=[];mods.forEach(m=>{list.push(m);if(hasTop(m))list.push(altMod(m));});
+  list.forEach(m=>{
+    const i=state.mods.indexOf(m),k=m.color==='roble'?P.roble:1,col=m.color==='roble'?'efecto roble':'blanco',AL=m.alt?' (altillo)':'';
     if(isR(m))add('Módulos',`Módulo de rincón (ángulo izquierdo) 40 × ${cm(m.h)} × 54 · ${col}`,1,X(`rinc|${m.color}|${m.h}`,P.rincon[m.h]*k));
-    else add('Módulos',`${m.d===28?'Módulo de librería':'Módulo de armario'} ${m.w} × ${cm(m.h)} × ${m.d} · ${col}`,1,X(`mod|${m.color}|${m.w}|${m.h}|${m.d}`,P.mod[m.h][m.w]*P.fondo[m.d]*k));
+    else add('Módulos',`${m.d===28?'Módulo de librería':'Módulo de armario'} ${m.w} × ${cm(m.h)} × ${m.d}${AL} · ${col}`,1,X(`mod|${m.color}|${m.w}|${m.h}|${m.d}`,P.mod[m.h][m.w]*P.fondo[m.d]*k));
     if(m.base==='patas'){add('Patas',`Patas Leo × 2 · ${state.legFin}`,2,P.leo);if(m.h===38.4)add('Patas','Pata de refuerzo × 1 · negro',1,P.refPata);}
     const dp=doorPlan(m);
     if(!dp.slide&&m.finish!=='none')dp.stack.forEach(s=>{
-      add('Puertas abatibles',`Puerta ${FIN[m.finish].name} ${cm(dp.lw)} × ${cm(s.h)}${isR(m)?' (rincón)':''}`,dp.n,isR(m)&&LM[`doorR|${m.finish}|${m.h}`]?X(`doorR|${m.finish}|${m.h}`,0):X(doorKey(m.finish,dp.lw,s.h),doorPrice(m.finish,dp.lw,s.h)));
+      add('Puertas abatibles',`Puerta ${FIN[m.finish].name} ${cm(dp.lw)} × ${cm(s.h)}${isR(m)?' (rincón)':AL}`,dp.n,isR(m)&&LM[`doorR|${m.finish}|${m.h}`]?X(`doorR|${m.finish}|${m.h}`,0):X(doorKey(m.finish,dp.lw,s.h),doorPrice(m.finish,dp.lw,s.h)));
       for(let q=0;q<dp.n;q++){
         if(isR(m)||(isL80(i)&&q===0&&s.y===0)){add('Bisagras','Set 4 bisagras angulares 2 amortiguadas',1,X('hinge|ang',P.hinge.ang));}
         else{const [n,key,u]=hingeLine(m.finish,s.mh);add('Bisagras',n,1,X(key,u));}
@@ -736,13 +743,14 @@ function moduleSVG(m,x,i,view,Hmax){
   const L=lift(m);
   let s=`<g class="mod" data-act="sel" data-i="${i}" transform="translate(0 ${Hmax-m.h-L})">`;
   s+=faceSVG(m,x,i,view);
+  const TP=hasTop(m,i)?TOPH:0;if(TP)s+=`<g transform="translate(0 ${-TP})">${faceSVG(altMod(m),x,i,view)}</g>`;
   if(L){const lc=HCOL[state.legFin]||'#222';s+=`<path d="M${x+2} ${m.h}l1.5 ${L}h1.4l.6 -${L}zM${x+m.w-2} ${m.h}l-1.5 ${L}h-1.4l-.6 -${L}z" fill="${lc}"/>`;}
-  if(i===state.sel)s+=R(x-1.2,-1.2,m.w+2.4,m.h+2.4+L,'none','style="stroke:var(--accent)" stroke-width=".9" stroke-dasharray="3 1.5"');
-  if(state.dims!==false)s+=TXT(x+m.w/2,m.h+L+8,`${isR(m)?'rincón ':''}${m.w}×${cm(m.h)}`)+TXT(x+m.w/2,m.h+L+13.5,`fondo ${m.d}`);
+  if(i===state.sel)s+=R(x-1.2,-1.2-TP,m.w+2.4,m.h+TP+2.4+L,'none','style="stroke:var(--accent)" stroke-width=".9" stroke-dasharray="3 1.5"');
+  if(state.dims!==false)s+=TXT(x+m.w/2,m.h+L+8,`${isR(m)?'rincón ':''}${m.w}×${cm(m.h)}${TP?' + '+cm(TP):''}`)+TXT(x+m.w/2,m.h+L+13.5,`fondo ${m.d}`);
   return s+'</g>';
 }
 function renderCanvas(){
-  const ms=state.mods,W=ms.reduce((a,m)=>a+m.w,0),H=Math.max(...ms.map(m=>m.h+lift(m))),{a,b,c}=runs();
+  const ms=state.mods,W=ms.reduce((a,m)=>a+m.w,0),H=Math.max(...ms.map(m=>fullH(m)+lift(m))),{a,b,c}=runs();
   const OFF=wallOff();let x=0,body='';
   ms.forEach((m,i)=>{body+=moduleSVG(m,x,i,state.view,H);x+=m.w;
     if(i===c)body+=`<line x1="${x}" y1="-5" x2="${x}" y2="${H+3}" stroke="#a8723a" stroke-width=".6" stroke-dasharray="2 1.5"/>`;});
@@ -857,6 +865,8 @@ function renderPanel(){
       return `<div class="field"><span class="tlabel">Altura de la puerta · hueco de ${cm(R)} cm</span>${seg('dcover',opts,cur)}
         ${m.doorH&&m.doorH<R-.1?`<div class="srow"><span>La puerta va</span>${seg('dpos',[['top','Arriba'],['bottom','Abajo']],m.doorPos==='bottom'?'bottom':'top')}<small class="mini">El resto (${cm(R-m.doorH)} cm) queda abierto.</small></div>`:''}</div>`;})():''}
   </div>`}
+  ${canTop(m,i)?`<div class="field"><span class="tlabel">Altillo encima · módulo ${m.w} × 38,4 × 54${m.top?` · total ${cm(m.h+TOPH)} cm`:''}</span>${seg('top',[['no','Sin altillo'],['si','Con altillo']],m.top?'si':'no')}
+    ${m.top?`<div class="srow"><span>Puerta del altillo</span>${seg('tfin',[['none','Sin puerta']].concat(Object.keys(FIN).filter(f=>!FIN[f].hs||FIN[f].hs.includes(TOPH)).map(f=>[f,FIN[f].name])),m.top.finish||'none')}</div><small class="mini">El altillo va atornillado encima del módulo y lleva su propia puerta${m.w===80?' (2 puertas de 39,7 × 38,1)':` de ${m.w===60?'59,7':'39,7'} × 38,1`}.</small>`:''}</div>`:''}
   ${m.ackOpen?'':assistHTML(m)}
   ${m.items.includes('cajon_ext')?`<div class="field"><span class="tlabel">Frente de cajón exterior</span><div class="chips">${DRAWER_FIN.map(f=>`<button class="fchip" data-act="dfin" data-v="${f}" aria-pressed="${m.dfin===f}"><span style="background:${finFill(f).startsWith('url')?'#c69a69':finFill(f)}"></span>${FIN[f].name}</button>`).join('')}</div></div>`:''}
   ${m.items.includes('cajon_int')?`<div class="field"><span class="tlabel">Frente de cajón interior</span>${seg('ifront',Object.entries(IFRONT),m.ifront)}</div>`:''}
@@ -1283,7 +1293,9 @@ function buildModule(g,m,i,ctr){
   if(m.d!==28&&!isR(m))['l','r'].forEach(sd=>{if((m.panels||{})[sd])add(1.9,H,D,sd==='l'?-.95:w+.95,H/2,D/2,finMat(pf));});
   if(lift(m)){const lm=M['h_'+state.legFin]||M.h_negro;[[3,3],[w-3,3],[3,D-3],[w-3,D-3]].forEach(([lx,lz])=>{
     const l=new THREE.Mesh(new THREE.CylinderGeometry(1.1,.6,LEG,10),lm);l.position.set(lx,-LEG/2,lz);l.castShadow=true;l.userData.i=i;g.add(l);});}
-  return [new THREE.Vector3(-.8,-.2-lift(m),-.8),new THREE.Vector3(w+.8,H+.8,D+6)];
+  const TP=!m.alt&&hasTop(m,i)?TOPH:0;
+  if(TP){const tg=new THREE.Group();tg.position.y=H;g.add(tg);buildModule(tg,altMod(m),i,ctr);}
+  return [new THREE.Vector3(-.8,-.2-lift(m),-.8),new THREE.Vector3(w+.8,H+TP+.8,D+6)];
 }
 
 function build3D(){
@@ -1541,7 +1553,7 @@ function proposeFor(W,Hc){
 function roomIssues(){const r=room();if(!r.on)return [];const {a,b,c}=runs(),out=[];
   if(a>r.w+.01)out.push(`El armario mide ${cm(a)} cm de ancho y la pared ${cm(r.w)} cm: sobran ${cm(a-r.w)} cm.`);
   if(c>=0&&b>r.lw+.01)out.push(`El tramo de la pared izquierda mide ${cm(b)} cm y la pared ${cm(r.lw)} cm.`);
-  const hm=Math.max(...state.mods.map(m=>m.h+lift(m)));if(hm>r.h)out.push(`El módulo más alto llega a ${cm(hm)} cm y el techo está a ${cm(r.h)} cm.`);
+  const hm=Math.max(...state.mods.map(m=>fullH(m)+lift(m)));if(hm>r.h)out.push(`El módulo más alto llega a ${cm(hm)} cm y el techo está a ${cm(r.h)} cm.`);
   return out;}
 function renderStart(){
   const r=room(),iss=roomIssues(),{a}=runs(),fill=r.on?Math.min(100,a/r.w*100):0;
@@ -1703,7 +1715,7 @@ function dims3D(){
   const wTxt=c<0?`${cm(a)} cm`:`${cm(a)} cm`;
   dimLine(D,new THREE.Vector3(all.min.x,y,z),new THREE.Vector3(all.max.x,y,z));
   const sw=textSprite(wTxt,true);sw.position.set((all.min.x+all.max.x)/2,y+6,z);D.add(sw);
-  const hx=all.min.x-10,hm=Math.max(...state.mods.map(m=>m.h+lift(m)));
+  const hx=all.min.x-10,hm=Math.max(...state.mods.map(m=>fullH(m)+lift(m)));
   dimLine(D,new THREE.Vector3(hx,0,z),new THREE.Vector3(hx,hm,z));
   const sh=textSprite(`${cm(hm)} cm`,true);sh.position.set(hx-4,hm/2,z);D.add(sh);
   const ds=state.mods.filter(m=>!isR(m)).map(m=>m.d),dz=ds.length?Math.max(...ds):54,dx=all.max.x+8;
@@ -1849,6 +1861,8 @@ document.addEventListener('click',e=>{
     case 'base':m.base=v;break;
     case 'color':m.color=v;break;
     case 'finish':m.finish=v;break;
+    case 'top':m.top=v==='si'?{finish:(m.top&&m.top.finish)||(m.finish!=='none'&&(!FIN[m.finish].hs||FIN[m.finish].hs.includes(TOPH))?m.finish:'riga_blanca')}:null;break;
+    case 'tfin':if(m.top)m.top.finish=v;break;
     case 'dfin':m.dfin=v;break;
     case 'ifront':m.ifront=v;break;
     case 'panel':m.panels[v]=!m.panels[v];break;
