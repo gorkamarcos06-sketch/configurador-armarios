@@ -593,6 +593,18 @@ const LM={
  'prof|2|blanco':['86365083',51.99],'prof|3|blanco':['86365087',67.99],'prof|3|gris':['86365093',55.99],
  'slide|riga_blanca|60':['84600992',28.79],'slide|riga_roble|60':['84600994',31.99],
  /* iluminación (equivalencias más cercanas) */
+ /* añadidas 19/11/2026 desde leroymerlin.es */
+ 'mod|blanco|80|102.4|38':['84600927',38.99],'rinc|blanco|230.4':['84600983',185],'rinc|roble|230.4':['84600985',195],
+ 'door|lucerna|40|38.4':['97395312',32.99],'door|lucerna|40|230.4':['97395321',72.99],'door|samara|60|230.4':['90540242',249],
+ 'estr|40|54':['84600842',18.99],'ifr|vitrificado|60':['84601002',17.99],
+ 'efr|riga_roble|80':['84601042',10.49],'efr|sevilla|60':['84870096',23.99],'efr|vienne_gris|60':['84684944',22.99],'efr|vienne_gris|80':['84684945',26.49],
+ 'efr|vienne_lino|60':['92530059',21.99],'efr|vienne_lino|80':['92530060',25.29],'efr|newport|60':['84988443',29.99],
+ 'balda|blanco|40|28':['84600847',9.49],'balda|roble|40|28':['84600849',11.29],'balda|blanco|60|28':['84600854',11.99],'balda|roble|60|28':['84600857',11.99],
+ 'balda|blanco|80|28':['84600863',14.49],'balda|roble|80|28':['84600865',19.99],'balda|roble|80|38':['84600891',19.99],'balda|blanco|40|rincon':['84600871',13.49],
+ 'leo|dorado':['85186288',10.49],'refpata':['85186292',3.99],
+ 'rail|60x2':['90201814',71.99],'rail|80x2':['90201813',87.99],'rail|60x3':['90201815',90.99],'rail|80x3':['90201816',101],
+ 'slide|riga_blanca|80':['84600993',48.99],'slide|riga_roble|80':['84600995',36.99],'slide|espejo|60':['84600999',109],'slide|espejo|80':['84601001',129],'slide|newport|60':['84988445',80.99],
+ 'prof|2|gris':['86365092',53.99],
  'led|techo':['98207028',25.99],'led|lateral':['97568375',19.99],'led|conv':['97568365',27.99],'led|barra':['98602370',53.99]
 };
 const lm=(k,fb)=>{const v=LM[k];return v?{u:v[1],ref:v[0]}:{u:fb,ref:null};};
@@ -618,7 +630,7 @@ function bom(mods,lots=true){
     const i=state.mods.indexOf(m),k=m.color==='roble'?P.roble:1,col=m.color==='roble'?'efecto roble':'blanco',AL=m.alt?' (altillo)':'';
     if(isR(m))add('Módulos',`Módulo de rincón (ángulo izquierdo) 40 × ${cm(m.h)} × 54 · ${col}`,1,X(`rinc|${m.color}|${m.h}`,P.rincon[m.h]*k));
     else add('Módulos',`${m.d===28?'Módulo de librería':'Módulo de armario'} ${m.w} × ${cm(m.h)} × ${m.d}${AL} · ${col}`,1,X(`mod|${m.color}|${m.w}|${m.h}|${m.d}`,P.mod[m.h][m.w]*P.fondo[m.d]*k));
-    if(m.base==='patas'){add('Patas',`Patas Leo × 2 · ${state.legFin}`,2,P.leo);if(m.h===38.4)add('Patas','Pata de refuerzo × 1 · negro',1,P.refPata);}
+    if(m.base==='patas'){add('Patas',`Set 2 patas Leo · ${state.legFin}`,2,X(`leo|${state.legFin}`,P.leo));if(m.h===38.4)add('Patas','Pata de refuerzo · negro',1,X('refpata',P.refPata));}
     const dp=doorPlan(m);
     if(!dp.slide&&m.finish!=='none')dp.stack.forEach(s=>{
       add('Puertas abatibles',`Puerta ${FIN[m.finish].name} ${cm(dp.lw)} × ${cm(s.h)}${isR(m)?' (rincón)':AL}`,dp.n,isR(m)&&LM[`doorR|${m.finish}|${m.h}`]?X(`doorR|${m.finish}|${m.h}`,0):X(doorKey(m.finish,dp.lw,s.h),doorPrice(m.finish,dp.lw,s.h)));
@@ -650,8 +662,8 @@ function bom(mods,lots=true){
   if(nH)lots?add('Tiradores',`Lote de ${H.pack} · ${H.kind==='knob'?'':'Tirador '}${H.name}`,Math.ceil(nH/H.pack),H.p,H.ref):add('Tiradores',`Tirador ${H.name}`,nH,r2(H.p/H.pack),H.ref);
   if(state.apertura==='corredera'&&mods===state.mods&&!slideCheck()){
     const S=SLIDE[state.slideFin],n=mods.length,w=mods[0].w;
-    add('Puertas correderas',`Puerta corredera ${S.name} ${w===80?'80,5':'60,5'} × ${state.slideFin==='newport'?'230,1':'224,4'}${S.panels?' (pack 4 paneles)':''}`,n,w===60?X(`slide|${state.slideFin}|60`,S.p):S.p*1.2);
-    const kit=RAILS[`${w}x${n}`];add('Puertas correderas',`Kit de rieles para ${n} puertas + amortiguador · ${kit[0]} cm`,1,kit[1]);
+    add('Puertas correderas',`Puerta corredera ${S.name} ${w===80?'80,5':'60,5'} × ${state.slideFin==='newport'?'230,1':'224,4'}${S.panels?' (pack 4 paneles)':''}`,n,X(`slide|${state.slideFin}|${w}`,w===60?S.p:S.p*1.2));
+    const kit=RAILS[`${w}x${n}`];add('Puertas correderas',`Set guía para ${n} puertas correderas · ${kit[0]} cm`,1,X(`rail|${w}x${n}`,kit[1]));
     if(S.panels)add('Puertas correderas',`Set de perfiles para ${n} puertas correderas 230,4 · ${state.slideProf==='gris'?'inox':'blanco'}`,1,X(`prof|${n}|${state.slideProf}`,P.profiles[n]));
   }
   return rows;
