@@ -426,7 +426,7 @@ const ITEMS_={
   zap_fijo:{name:'Zapatero fijo',short:'Zap. fijo',g:'Guardar',h:22.4,dim:m=>`${m.w===80?'76,4':'56,4'} × 35,7 cm`,p:m=>m.w===80?17.95:14.95,ok:m=>m.w>=60&&m.d>=38,why:'Solo 60/80 y fondo 38+'},
   cajon_int:{name:'Cajón interior',short:'Cajón int.',g:'Cajones',h:25.6,dim:m=>`frente 22,5 × ${cm(IFW[m.w])} cm`,p:m=>P.istr[m.w]+(m.d===54?3:0)+P.ifr[m.w]+(m.ifront==='vitrificado'?6:0),ok:m=>m.d>=38,why:'Fondo 38 o 54',tip:'No puede ir abajo del todo: si quieres algo abajo, pon una cesta.'},
   cajon_ext:{name:'Cajón exterior',short:'Cajón ext.',g:'Cajones',h:FD-.9,dim:m=>`frente 25,6 × ${cm(EFW[m.w])} cm`,p:m=>P.estr[m.w]+r2(P.efr[m.w]*P.efin[m.dfin||'riga_blanca']),ok:m=>m.w>=60&&m.d>=38&&state.apertura!=='corredera',why:'Solo 60/80, fondo 38+ y abatibles'},
-  refuerzo:{name:'Barra de refuerzo',short:'Refuerzo',g:'Estructura',h:6.4,dim:()=>'74,5 cm · negro',p:()=>7.95,ok:m=>m.w===80,why:'Solo módulos de 80',tip:'Va bajo la balda, delante. Recomendada en librerías.'}
+  refuerzo:{name:'Barra de refuerzo',short:'Refuerzo',g:'Estructura',h:6.4,dim:()=>'74,5 cm · negro',p:()=>3.99,ok:m=>m.w===80,why:'Solo módulos de 80',tip:'Va bajo la balda, delante. Recomendada en librerías.'}
 };
 const isSp=t=>typeof t==='string'&&t.startsWith('esp:');
 const spItem=t=>({name:'Hueco',short:'Hueco',g:'-',h:parseFloat(t.slice(4))||0,dim:()=>'',p:()=>0,ok:()=>1,sp:1});
@@ -527,7 +527,7 @@ function normAll(){
     if(m.h<204.8&&m.base==='zocalo')m.base='suelo';
     if(m.d===28&&!m.items.length)m.items=['balda','balda','balda','balda'];
     if(isR(m)&&m.split)m.split=false;
-    if(!DRAWER_FIN.includes(m.dfin))m.dfin='riga_blanca';
+    if(!DRAWER_FIN.includes(m.dfin))m.dfin='riga_blanca';if(m.w===40&&m.ifront==='vitrificado')m.ifront='blanco';
     fixItems(m);if(!finOK(m.finish,m))m.finish=m.finish==='none'?'none':'riga_blanca';});
   if(state.apertura==='corredera'&&slideCheck())state.apertura='abatible';
   if(!HANDLES[state.handle.model])state.handle.model='nino';state.handle.fin=HANDLES[state.handle.model].fin;
@@ -600,11 +600,13 @@ const LM={
  'efr|riga_roble|80':['84601042',10.49],'efr|sevilla|60':['84870096',23.99],'efr|vienne_gris|60':['84684944',22.99],'efr|vienne_gris|80':['84684945',26.49],
  'efr|vienne_lino|60':['92530059',21.99],'efr|vienne_lino|80':['92530060',25.29],'efr|newport|60':['84988443',29.99],
  'balda|blanco|40|28':['84600847',9.49],'balda|roble|40|28':['84600849',11.29],'balda|blanco|60|28':['84600854',11.99],'balda|roble|60|28':['84600857',11.99],
- 'balda|blanco|80|28':['84600863',14.49],'balda|roble|80|28':['84600865',19.99],'balda|roble|80|38':['84600891',19.99],'balda|blanco|40|rincon':['84600871',13.49],
+ 'balda|blanco|80|28':['84600863',14.49],'balda|roble|80|28':['84600865',19.99],'balda|roble|80|38':['84600891',19.99],'balda|blanco|40|rincon':['84600871',14.49],
  'leo|dorado':['85186288',10.49],'refpata':['85186292',3.99],
  'rail|60x2':['90201814',71.99],'rail|80x2':['90201813',87.99],'rail|60x3':['90201815',90.99],'rail|80x3':['90201816',101],
  'slide|riga_blanca|80':['84600993',48.99],'slide|riga_roble|80':['84600995',36.99],'slide|espejo|60':['84600999',109],'slide|espejo|80':['84601001',129],'slide|newport|60':['84988445',80.99],
  'prof|2|gris':['86365092',53.99],
+ 'door|lucerna|40|102.4':['97395313',44.99],'door|samara|60|102.4':['91776654',129],'slide|newport|80':['84988446',103],'efr|riga_roble|60':['84601041',9.99],
+ 'leo|blanco':['85186286',6.29],'leo|negro':['85186287',6.29],'balda|blanco|40|38':['84600871',14.49],'balda|roble|40|38':['84600873',12.79],'refuerzo':['84990242',3.99],
  'led|techo':['98207028',25.99],'led|lateral':['97568375',19.99],'led|conv':['97568365',27.99],'led|barra':['98602370',53.99]
 };
 const lm=(k,fb)=>{const v=LM[k];return v?{u:v[1],ref:v[0]}:{u:fb,ref:null};};
@@ -649,7 +651,7 @@ function bom(mods,lots=true){
         add('Cajones',`Frente cajón interior ${m.w} × 22,5 · ${IFRONT[m.ifront].toLowerCase()}`,1,X(`ifr|${m.ifront}|${m.w}`,P.ifr[m.w]+(m.ifront==='vitrificado'?6:0)));return;}
       if(t==='cajon_ext'){add('Cajones',`Estructura cajón interior/exterior ${m.w} × 25,6 × ${m.d===54?54:38} · blanco`,1,X(`estr|${m.w}|${m.d===54?54:38}`,P.estr[m.w]));
         add('Cajones',`Frente cajón exterior ${FIN[m.dfin].name} ${m.w} × 25,6`,1,X(`efr|${m.dfin}|${m.w}`,P.efr[m.w]*P.efin[m.dfin]));nHandleDrawers++;return;}
-      const ak={barra:'barra|'+m.w,cesta_comp:'cesta_comp|'+m.w,pantalonero:'pantalonero|'+m.w,perchero:'perchero',zap_desl:'zap_desl|'+m.w,zap_fijo:'zap_fijo|'+m.w,cesta_lat:'cesta_lat',abatible:'abatible'}[t];
+      const ak={refuerzo:'refuerzo',barra:'barra|'+m.w,cesta_comp:'cesta_comp|'+m.w,pantalonero:'pantalonero|'+m.w,perchero:'perchero',zap_desl:'zap_desl|'+m.w,zap_fijo:'zap_fijo|'+m.w,cesta_lat:'cesta_lat',abatible:'abatible'}[t];
       add('Accesorios interiores',`${it.name} ${it.dim(m)}`,1,ak?X(ak,it.p(m)):it.p(m));});
     const L=m.leds||{},nr=m.items.filter(t=>t==='barra'||t==='abatible').length;
     if(L.techo)add('Iluminación LED','Luminaria LED Pyxis negra 2,3 m · blanco cálido (techo)',1,X('led|techo',P.led.techo[isR(m)?40:m.w]));
@@ -916,7 +918,7 @@ function renderPanel(){
   ${canTop(m,i)?`<div class="field"><span class="tlabel">Altillo encima · módulo ${m.w} × 38,4 × 54${m.top?` · total ${cm(m.h+TOPH)} cm`:''}</span>${seg('top',[['no','Sin altillo'],['si','Con altillo']],m.top?'si':'no')}
     ${m.top?`<div class="srow"><span>Puerta del altillo</span>${seg('tfin',[['none','Sin puerta']].concat(Object.keys(FIN).filter(f=>!FIN[f].hs||FIN[f].hs.includes(TOPH)).map(f=>[f,FIN[f].name])),m.top.finish||'none')}</div><small class="mini">El altillo va atornillado encima del módulo y lleva su propia puerta${m.w===80?' (2 puertas de 39,7 × 38,1)':` de ${m.w===60?'59,7':'39,7'} × 38,1`}.</small>`:''}</div>`:''}
   ${m.items.includes('cajon_ext')?`<div class="field"><span class="tlabel">Frente de cajón exterior</span><div class="chips">${DRAWER_FIN.map(f=>`<button class="fchip" data-act="dfin" data-v="${f}" aria-pressed="${m.dfin===f}"><span style="background:${finFill(f).startsWith('url')?'#c69a69':finFill(f)}"></span>${FIN[f].name}</button>`).join('')}</div></div>`:''}
-  ${m.items.includes('cajon_int')?`<div class="field"><span class="tlabel">Frente de cajón interior</span>${seg('ifront',Object.entries(IFRONT),m.ifront)}</div>`:''}
+  ${m.items.includes('cajon_int')?`<div class="field"><span class="tlabel">Frente de cajón interior</span>${seg('ifront',Object.entries(IFRONT).map(([k,l])=>[k,l,k==='vitrificado'&&m.w===40,'No existe para módulos de 40']),m.ifront)}</div>`:''}
   ${!isR(m)&&m.d!==28?`<div class="field"><span class="tlabel">Paneles laterales de acabado</span>${seg('panel',[['l','Izquierdo'],['r','Derecho']].map(([k,l])=>[k,l]),'')}</div>`.replace(/aria-pressed="false"/g,'').replace(/data-v="l"/,`data-v="l" aria-pressed="${!!m.panels.l}"`).replace(/data-v="r"/,`data-v="r" aria-pressed="${!!m.panels.r}"`):''}
   ${notesFor(m,i).length?`<div class="notes"><b>Es bueno saber</b><ul>${notesFor(m,i).map(t=>`<li>${t}</li>`).join('')}</ul></div>`:''}
   <div class="golinks"><button class="golink" data-act="goto" data-v="interior"><b>Configurar el interior</b><small>${realItems(m).length} elementos · baldas, barras, cajones…</small><span>→</span></button>
