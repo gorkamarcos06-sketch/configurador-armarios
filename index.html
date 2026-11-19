@@ -140,6 +140,7 @@ body.dragging,body.dragging *{cursor:grabbing!important;user-select:none}
 .stepcard{padding:16px;display:flex;flex-direction:column;gap:14px}
 .stepfoot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;position:sticky;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:5;box-shadow:0 6px 24px rgba(0,0,0,.08)}
 .stepfoot .sf{font-size:.88rem;color:var(--muted);text-align:center}.stepfoot .sf b{color:var(--ink)}
+.sftot{display:flex;flex-direction:column;align-items:center;line-height:1.1;text-align:center}.sftot small{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.sftot b{font:700 1.25rem var(--f-display);color:var(--ink);white-space:nowrap}
 @media (max-width:600px){.stepfoot .sf{display:none}}
 .stgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:22px;align-items:start}
 @media (max-width:860px){.stgrid{grid-template-columns:minmax(0,1fr)}}
@@ -1359,6 +1360,7 @@ function build3D(){
   G.groups=[];state.mods.forEach(place);
   {const P0=state.place||{},noR=c<0;G.root.position.set(noR&&!RM.on?(P0.dx||0):0,0,noR?(P0.dz||0):0);}
   applyNight();dims3D();G.dirty=4;
+  if(!G.fitted){G.fitted=true;camView('persp');}
 }
 
 /* ===================== APARTADO DE TIRADORES ===================== */
@@ -1381,7 +1383,7 @@ function thumbFor(model,fin){
     const cam=new THREE.PerspectiveCamera(30,240/150,1,500);HT={r,sc,cam,g:null};}
   if(HT.g){HT.sc.remove(HT.g);}
   const g=new THREE.Group();HT.g=g;HT.sc.add(g);
-  const plate=box3(30,12,1,0,0,-.5,M.f_riga_blanca,0,g);plate.castShadow=false;
+  if(!M.thumbPlate)M.thumbPlate=new THREE.MeshStandardMaterial({color:new THREE.Color('#a9a59d').convertSRGBToLinear(),roughness:.7});const plate=box3(30,12,1,0,0,-.5,M.thumbPlate,0,g);plate.castShadow=false;
   handle3D(g,0,0,0,0,HANDLES[model].kind==='knob',model);
   g.rotation.set(-.35,.55,0);
   const big=HANDLES[model].kind==='bar'&&HANDLES[model].L>12;HT.cam.position.set(0,0,big?52:30);HT.cam.lookAt(0,0,0);
@@ -1433,7 +1435,7 @@ function renderHandles(){
   const hm=state.handle.model,H=HANDLES[hm];
   const rows=bom(state.mods).filter(r=>r.g==='Tiradores'),cost=bomTotal(rows);
   const nDoorUnits=bom(state.mods,false).filter(r=>r.g==='Tiradores').reduce((a,r)=>a+r.q,0);
-  document.getElementById('thead').innerHTML=`<button class="collh" data-act="coll" data-v="tiradores"><span class="num-badge">3</span><h2>Tiradores</h2><span class="chev">▾</span></button><span class="dims">Se venden en lotes de ${H.pack} · ${nDoorUnits} en tu armario</span>`;
+  document.getElementById('thead').innerHTML=`<button class="collh" data-act="coll" data-v="tiradores"><span class="num-badge">3</span><h2>Tiradores</h2><span class="chev">▾</span></button><span class="dims" style="flex-basis:100%">Se venden en lotes de ${H.pack} · ${nDoorUnits} en tu armario</span>`;
   document.getElementById('tcap').innerHTML=`<b>${H.name}</b><span>${H.dim} · Ref. ${H.ref}</span>`;
   document.getElementById('tside').innerHTML=`
     <div class="tcards">${Object.entries(HANDLES).map(([k,h])=>{const img=thumbFor(k,h.fin);
@@ -1523,7 +1525,7 @@ function renderSteps(){
     `<li class="sbar" aria-hidden="true"><span style="width:${cur/(STEPS.length-1)*100}%"></span></li>`;
   SIDE_IDS.forEach(id=>{const el=document.getElementById(id);if(el)el.hidden=!STEPS[cur][0].split(',').includes(id);});
   document.getElementById('stepfoot').innerHTML=`<button class="btn" data-act="step" data-v="${cur-1}" ${cur===0?'disabled':''}>← Atrás</button>
-    <span class="sf">Paso ${cur+1} de ${STEPS.length} · <b>${STEPS[cur][1]}</b></span>
+    <span class="sftot"><small>Total armario</small><b>${eur.format(bomTotal(bom(state.mods)))}</b></span>
     ${cur<STEPS.length-1?`<button class="btn primary" data-act="step" data-v="${cur+1}">Siguiente: ${STEPS[cur+1][1]} →</button>`:'<span></span>'}`;
 }
 
@@ -1746,7 +1748,8 @@ function dims3D(){
   G.dirty=4;
 }
 function camView(k){if(!G)return;const all=new THREE.Box3();(G.groups||[]).forEach(g=>all.union(new THREE.Box3().setFromObject(g.userData.body||g)));if(all.isEmpty())return;
-  const c=all.getCenter(new THREE.Vector3()),sz=all.getSize(new THREE.Vector3()),dist=Math.max(sz.x,sz.y*1.3)*1.25+120;
+  const c=all.getCenter(new THREE.Vector3()),sz=all.getSize(new THREE.Vector3()),t=Math.tan(G.camera.fov*Math.PI/360),asp=G.camera.aspect||1.4;
+  const dist=Math.max(sz.y*.62/t,(sz.x*.58+sz.z*.3)/(t*asp))+sz.z*.6+40;
   if(k==='front')G.camera.position.set(c.x,c.y+5,all.max.z+dist);
   else if(k==='left')G.camera.position.set(c.x-dist*.75,c.y+30,all.max.z+dist*.6);
   else G.camera.position.set(c.x+dist*.45,c.y+60,all.max.z+dist*.8);
