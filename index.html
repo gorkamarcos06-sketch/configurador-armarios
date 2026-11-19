@@ -1114,7 +1114,7 @@ function ensure3D(){
   const env2=new THREE.Scene(),room2=new THREE.Mesh(new THREE.BoxGeometry(1000,600,1000),new THREE.MeshBasicMaterial({color:0x08090c,side:THREE.BackSide}));room2.position.y=250;env2.add(room2);
   const moon=new THREE.Mesh(new THREE.PlaneGeometry(300,200),new THREE.MeshBasicMaterial({color:new THREE.Color(.1,.12,.18),side:THREE.DoubleSide}));moon.position.set(-300,380,320);moon.lookAt(0,100,0);env2.add(moon);
   const envNight=pm.fromScene(env2,.04).texture;
-  const camera=new THREE.PerspectiveCamera(38,1,5,3000);
+  const camera=new THREE.PerspectiveCamera(50,1,5,3000);
   const controls=new THREE.OrbitControls(camera,renderer.domElement);
   controls.enableDamping=true;controls.maxPolarAngle=Math.PI/2-.05;controls.minDistance=60;controls.maxDistance=1300;
   controls.minAzimuthAngle=-1.3;controls.maxAzimuthAngle=1.3;
@@ -1152,7 +1152,9 @@ function ensure3D(){
     if(state.view!=='3d')return;
     let mv=0;G.doors.forEach(p=>{const u=p.userData;let d;if(u.kind==='pull'){const t=state.open?u.out:0;d=t-p.position.z;p.position.z+=d*.1;}else if(u.kind==='slide'){const t=u.base+(state.open?u.slide:0);d=t-p.position.x;p.position.x+=d*.12;}else{const t=state.open?u.open:0;d=(t-p.rotation.y)*30;p.rotation.y+=(t-p.rotation.y)*.12;}if(Math.abs(d)>.02)mv=1;});
     if(controls.update())mv=1;if(mv)G.dirty=Math.max(G.dirty||0,2);
-    if(G.roomX){const x=camera.position.x;G.left.visible=x>G.roomX[0]+5;G.right.visible=x<G.roomX[1]-5;}
+    if(G.room){const r=G.room,p=camera.position,t=controls.target,m=22,cl=(v,a,b)=>Math.max(a,Math.min(b,v));
+      const px=p.x,py=p.y,pz=p.z;p.set(cl(p.x,r.L+m,r.R-m),cl(p.y,25,r.H-m),cl(p.z,m,r.D-m));t.set(cl(t.x,r.L+m,r.R-m),cl(t.y,10,r.H-m),cl(t.z,0,r.D-m));
+      if(px!==p.x||py!==p.y||pz!==p.z)G.dirty=Math.max(G.dirty||0,1);}
     if(!G.dirty)return;G.dirty--;
     if(state.hq!==false&&!state.lite&&G.comp)G.comp.c.render();else renderer.render(scene,camera);
   })();
@@ -1363,11 +1365,31 @@ function build3D(){
   {const P0=state.place||{},noR=c<0;G.root.position.set(noR&&!RM.on?(P0.dx||0):0,0,noR?(P0.dz||0):0);}
   /* habitación cerrada tipo IKEA: pared izquierda y derecha fijas; el armario se mueve dentro */
   {let L,Rr;if(c>=0){L=XL;Rr=XL+a+170;}else{const hw=Math.max(a/2+150,200);L=-hw;Rr=hw;const lim=hw-a/2-4;G.root.position.x=Math.max(-lim,Math.min(lim,G.root.position.x));}
-   G.left.position.x=L;G.right.position.x=Rr;G.left.visible=G.right.visible=true;G.roomX=[L,Rr];}
+   G.left.position.x=L;G.right.position.x=Rr;G.left.visible=G.right.visible=true;G.roomX=[L,Rr];
+   G.root.updateMatrixWorld(true);const bx=new THREE.Box3();G.groups.forEach(g=>bx.union(new THREE.Box3().setFromObject(g)));
+   const D=Math.max(470,(bx.isEmpty()?0:bx.max.z)+290),H=265;G.room={L,R:Rr,D,H};roomShell();}
   if(state.deco!==false)deco3D();
   if(G.win)G.win.visible=state.deco!==false;
   applyNight();dims3D();G.dirty=4;
   if(!G.fitted){G.fitted=true;camView('persp');}
+}
+
+/* ===================== HABITACIÓN CERRADA (pared frontal y techo) ===================== */
+function roomShell(){const r=G.room;
+  if(!G.shell){const sh=new THREE.Group();G.scene.add(sh);G.shell=sh;
+    M.ceil=new THREE.MeshStandardMaterial({color:new THREE.Color('#f4f3ef').convertSRGBToLinear(),roughness:.95});
+    const fw=new THREE.Mesh(new THREE.PlaneGeometry(1,700),M.wall);fw.rotation.y=Math.PI;fw.receiveShadow=true;sh.add(fw);sh.userData.fw=fw;
+    const fs=new THREE.Mesh(new THREE.BoxGeometry(1,8,1.4),M.skirt);sh.add(fs);sh.userData.fs=fs;
+    const ce=new THREE.Mesh(new THREE.PlaneGeometry(1,1),M.ceil);ce.rotation.x=Math.PI/2;sh.add(ce);sh.userData.ce=ce;
+    const cr=new THREE.Mesh(new THREE.BoxGeometry(1,4,4),M.skirt);sh.add(cr);sh.userData.cr=cr;
+    M.lamp=new THREE.MeshStandardMaterial({color:0xffffff,emissive:0xfff3dd,emissiveIntensity:1.4,roughness:.4});
+    const lp=new THREE.Mesh(new THREE.CylinderGeometry(16,18,4,40),M.lamp);sh.add(lp);sh.userData.lp=lp;}
+  const u=G.shell.userData,w=r.R-r.L,cx=(r.L+r.R)/2;
+  u.fw.scale.x=w+8;u.fw.position.set(cx,350,r.D+2);
+  u.fs.scale.x=w;u.fs.position.set(cx,4,r.D+1.3);
+  u.ce.scale.set(w+8,r.D+8,1);u.ce.position.set(cx,r.H,r.D/2);
+  u.cr.scale.x=w;u.cr.position.set(cx,r.H-2,1.5);
+  u.lp.position.set(cx,r.H-2,r.D*.55);
 }
 
 /* ===================== DECORACIÓN DE LA ESCENA (alfombra, planta, cuadro, ventana) ===================== */
@@ -1396,7 +1418,7 @@ function deco3D(){
   const sh=o=>{o.castShadow=state.lite!==true;o.receiveShadow=true;return o;};
   /* alfombra delante del armario */
   const cx=(box.min.x+box.max.x)/2,rw=Math.min(200,Math.max(140,(box.max.x-box.min.x)*.75));
-  const rug=new THREE.Mesh(new THREE.BoxGeometry(rw,.8,rw*1.4),[M.rug,M.rug,M.rug,M.rug,M.rug,M.rug]);rug.position.set(cx,.4,box.max.z+40+rw*.7);rug.receiveShadow=true;dg.add(rug);
+  const rug=new THREE.Mesh(new THREE.BoxGeometry(rw,.8,rw*1.4),[M.rug,M.rug,M.rug,M.rug,M.rug,M.rug]);rug.position.set(cx,.4,Math.min(box.max.z+40+rw*.7,(G.room?G.room.D-root.position.z:1e4)-rw*.7-25));rug.receiveShadow=true;dg.add(rug);
   /* planta a la derecha */
   const [RL,RR]=(G.roomX||[-1e4,1e4]).map(v=>v-root.position.x),rightOK=box.max.x+50<RR,px=rightOK?box.max.x+32:box.min.x-32,pz=Math.min(30,box.max.z-20),pot=sh(new THREE.Mesh(new THREE.CylinderGeometry(15,11,34,32),M.pot));pot.position.set(px,17,pz);dg.add(pot);
   const soil=new THREE.Mesh(new THREE.CylinderGeometry(14,14,1,24),M.soil);soil.position.set(px,32.6,pz);dg.add(soil);
@@ -1415,6 +1437,7 @@ function deco3D(){
     const v=new THREE.Mesh(new THREE.BoxGeometry(5,140,3),fm);v.position.set(.5,0,0);w.add(v);
     const sill=new THREE.Mesh(new THREE.BoxGeometry(14,2.5,132),fm);sill.position.set(5,-73,0);w.add(sill);
     w.rotation.y=Math.PI;w.position.set(1.6,150,260);G.right.add(w);G.win=w;}
+  if(G.room)G.win.position.z=Math.min(Math.max(box.max.z+root.position.z+150,200),G.room.D-90);
 }
 
 /* ===================== APARTADO DE TIRADORES ===================== */
@@ -1513,8 +1536,7 @@ const ICO={tienda:'<path d="M4 10h24v16H4zM2 10l3-6h22l3 6M12 26v-8h8v8" />',dom
   none:'<path d="M6 6h20v20H6z"/><path d="M6 6l20 20"/>',basic:'<path d="M5 27l11-11M14 5a6 6 0 0 0 8 8l6 6-3 3-6-6a6 6 0 0 0-8-8z"/>',
   full:'<path d="M3 27l9-9M10 4a5 5 0 0 0 7 7l5 5-2.5 2.5-5-5a5 5 0 0 0-7-7z"/><path d="M20 4l8 8M24 4v4h4"/>'};
 const ENVIO={tienda:{name:'Recogida en tienda',p:0,plazo:'Disponible en 48 h',ico:'tienda'},domicilio:{name:'Envío a domicilio',p:39,plazo:'5 a 7 días laborables · gratis desde 1.500 €',ico:'dom'},express:{name:'Envío exprés',p:69,plazo:'En 48 h laborables',ico:'exp'}};
-const MONTAJE={none:{name:'Sin montaje',desc:'Lo montas tú con las instrucciones',ico:'none'},basico:{name:'Montaje básico',desc:'Montaje de módulos, puertas, cajones y accesorios',ico:'basic'},
-  completo:{name:'Montaje completo',desc:'Montaje básico + fijación a pared, nivelado y ajuste de puertas',ico:'full'}};
+const MONTAJE={none:{name:'Sin montaje',desc:'Lo montas tú con las instrucciones',ico:'none'},basico:{name:'Montaje profesional',desc:'100 € por metro lineal de armario: módulos, puertas, cajones, accesorios, fijación a pared y nivelado',ico:'full'}};
 const svIco=k=>`<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICO[k]}</svg>`;
 function servCounts(){let mods=state.mods.length,hojas=0,caj=0,acc=0,led=0;
   state.mods.forEach(m=>{const dp=doorPlan(m);if(!dp.slide&&m.finish!=='none')hojas+=dp.n*dp.stack.length;
@@ -1522,17 +1544,15 @@ function servCounts(){let mods=state.mods.length,hojas=0,caj=0,acc=0,led=0;
   const slide=state.apertura==='corredera'&&!slideCheck();if(slide)hojas+=state.mods.length;
   return {mods,hojas,caj,acc,led,slide};}
 function servRows(prodTotal){
-  const sv=state.serv||(state.serv={});Object.entries({envio:'domicilio',planta:0,ascensor:true,montaje:'basico',retirada:false}).forEach(([k,v])=>{if(sv[k]===undefined)sv[k]=v;});
+  const sv=state.serv||(state.serv={});Object.entries({envio:'domicilio',planta:0,ascensor:true,montaje:'basico',retirada:false}).forEach(([k,v])=>{if(sv[k]===undefined)sv[k]=v;});if(!MONTAJE[sv.montaje])sv.montaje='basico';
   const rows=[],add=(g,name,q,u)=>{rows.push({g,name,q,u:r2(u)});};
   const E=ENVIO[sv.envio];
   if(sv.envio==='domicilio'&&prodTotal>=1500)add('Transporte','Envío a domicilio (gratis desde 1.500 €)',1,0);else add('Transporte',E.name,1,E.p);
   if(sv.envio!=='tienda'&&!sv.ascensor&&sv.planta>0)add('Transporte',`Subida sin ascensor · ${sv.planta}ª planta`,sv.planta,8);
   const c=servCounts();
   if(sv.montaje!=='none'){
-    add('Instalación','Montaje de módulo',c.mods,35);if(c.hojas)add('Instalación','Colocación y ajuste de puerta',c.hojas,6);
-    if(c.caj)add('Instalación','Montaje de cajón',c.caj,8);if(c.acc)add('Instalación','Montaje de accesorio interior',c.acc,3);
-    if(c.slide)add('Instalación','Instalación de rieles de corredera',1,40);if(c.led)add('Instalación','Conexión de iluminación LED',c.led,20);
-    if(sv.montaje==='completo'){add('Instalación','Fijación a pared y nivelado',c.mods,10);add('Instalación','Ajuste final y limpieza',1,25);}
+    const ml=r2(state.mods.reduce((a,m)=>a+m.w,0)/100);
+    add('Instalación',`Montaje del armario · ${String(ml).replace('.',',')} m lineales a 100 €/m`,ml,100);
   }
   if(sv.retirada)add('Instalación','Retirada del armario antiguo',1,49);
   return rows;
@@ -1558,7 +1578,7 @@ function renderServ(){
     <div class="icol sres">
       <div class="lines">${rows.map(r=>`<div><span>${r.q>1?r.q+' × ':''}${r.name}</span><span>${eur.format(r.q*r.u)}</span></div>`).join('')}<div class="tot"><span>Total servicios</span><span>${eur.format(tot)}</span></div></div>
       ${h?`<div class="stime"><b>${String(h).replace('.',',')} h</b><span>de montaje estimado · ${h>5?'2 técnicos':'1 técnico'}</span></div>`:''}
-      <p class="mini">Los armarios de más de 64 cm de alto deben fijarse a la pared${sv.montaje==='completo'?': incluido en el montaje completo.':'.'}</p>
+      <p class="mini">Los armarios de más de 64 cm de alto deben fijarse a la pared${sv.montaje!=='none'?': incluido en el montaje profesional.':'.'}</p>
     </div>
   </div>`;
 }
