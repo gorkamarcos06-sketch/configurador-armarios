@@ -272,6 +272,17 @@ td.num,th.num{text-align:right}
 tfoot td{border:0;font-weight:700;font-size:1.05rem;padding-top:12px}
 .note{font-size:.8rem;color:var(--muted);margin:10px 0 0}
 .sumhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.ctxm{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.2);padding:5px;min-width:210px;display:flex;flex-direction:column}
+.ctxm .ch{font-size:.74rem;color:var(--muted);padding:6px 12px 5px;border-bottom:1px solid var(--line);margin-bottom:3px;font-family:var(--f-mono,monospace)}
+.ctxm button{appearance:none;border:0;background:none;font:inherit;color:var(--ink);text-align:left;cursor:pointer;padding:9px 12px;border-radius:5px;font-size:.9rem}
+.ctxm button:hover:not([disabled]){background:var(--stage)}.ctxm button.danger{color:#c2410c;font-weight:600}.ctxm button[disabled]{opacity:.4;cursor:default}
+.dto{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}
+.dto .dres span:last-child{white-space:nowrap;font-variant-numeric:tabular-nums}.dto .dres .fin span:first-child{white-space:nowrap}
+.dto h3{margin:0 0 8px;font:700 1rem var(--f-display);letter-spacing:.02em}.dto .drow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.dto input{width:110px;padding:8px 10px;border:1px solid var(--line);border-radius:4px;font:inherit;background:var(--surface);color:var(--ink)}
+.dto .dres{display:flex;flex-direction:column;gap:6px;font-size:.92rem}.dto .dres div{display:flex;justify-content:space-between;gap:12px}
+.dto .dres .neg{color:#c2410c;font-weight:600}.dto .dres .fin{border-top:2px solid var(--ink);padding-top:8px;margin-top:4px;font:800 1.5rem var(--f-display);color:var(--accent)}
+.dto .dres small{color:var(--muted)}
 .big{font-family:var(--f-display);font-weight:800;font-size:2.4rem;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums;text-align:right}
 .big small{display:block;font:500 .75rem var(--f-body);color:var(--muted);margin-top:4px}
 @media (prefers-reduced-motion:no-preference){.seg button,.door,.btn{transition:background .15s,border-color .15s}}
@@ -358,7 +369,8 @@ tfoot td{border:0;font-weight:700;font-size:1.05rem;padding-top:12px}
       <thead><tr><th>Lista de compra</th><th class="num">Ref.</th><th class="num">Cant.</th><th class="num">Precio ud.</th><th class="num">Total</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
-    <p class="note" id="lmnote">Referencias y precios de leroymerlin.es consultados el 16/11/2026; pueden cambiar con ofertas. Los artículos marcados con <span class="est">*</span> no se han encontrado en la web y su precio es estimado. Baldas, bisagras y tiradores se venden en sets. Transporte e instalación con precios de ejemplo.</p>
+    <p class="note" id="lmnote">Referencias y precios de leroymerlin.es consultados en noviembre de 2026; pueden cambiar con ofertas. Baldas, bisagras, patas y tiradores se venden en sets. Montaje a 100 € por metro lineal de armario. Transporte con precios de ejemplo.</p>
+      <div class="dto" id="dto"></div>
       <div id="share"></div>
   </section>
   <div class="card stepfoot" id="stepfoot"></div>
@@ -972,10 +984,51 @@ function renderInterior(){
 function renderSummary(){
   const prod=bom(state.mods),rows=prod.concat(servRows(bomTotal(prod)).filter(r=>r.q*r.u>0||r.g==='Transporte')),groups=[...new Set(rows.map(r=>r.g))],tot=bomTotal(rows);
   document.getElementById('rows').innerHTML=groups.map(g=>`<tr class="grp"><td colspan="5">${g}</td></tr>`+rows.filter(r=>r.g===g).map(r=>`<tr><td>${r.name}${r.ref||['Transporte','Instalación'].includes(r.g)?'':' <span class="est" title="Precio estimado: no encontrado en la web">*</span>'}</td><td class="num ref">${r.ref||'—'}</td><td class="num">${r.q}</td><td class="num">${eur.format(r.u)}</td><td class="num">${eur.format(r.q*r.u)}</td></tr>`).join('')).join('');
-  document.getElementById('total').textContent=eur.format(tot);
+  const D=dtoCalc(prod,rows,tot);
+  document.getElementById('total').textContent=eur.format(D.fin);
+  renderDto(D);
   const {a,b,c}=runs();
   document.getElementById('dims').textContent=c<0?`${state.mods.length} módulos · ${a} cm de ancho`:`${state.mods.length} módulos · en L: ${cm(b)} + ${cm(a)} cm`;
 }
+/* ===================== MENÚ CON CLIC DERECHO SOBRE UN MÓDULO ===================== */
+function closeCtx(){const c=document.getElementById('ctxm');if(c)c.remove();}
+function openCtx(x,y,i){closeCtx();const m=state.mods[i];if(!m)return;
+  if(state.sel!==i){state.sel=i;state.selItem=-1;render();}
+  const n=state.mods.length,canDel=!(n<=1||isL80(i)),canDup=!(isR(m)||isL80(i)),d=document.createElement('div');d.className='ctxm';d.id='ctxm';d.setAttribute('role','menu');
+  d.innerHTML=`<div class="ch">Módulo ${i+1} · ${isR(m)?'rincón 40':m.w} × ${cm(m.h)} × ${m.d}</div>
+    <button role="menuitem" data-act="goto" data-v="panel">Editar medidas y puertas</button>
+    <button role="menuitem" data-act="goto" data-v="interior">Editar interior</button>
+    <button role="menuitem" data-act="dup" ${canDup?'':'disabled'}>Duplicar módulo</button>
+    <button role="menuitem" class="danger" data-act="del" ${canDel?'':`disabled title="${n<=1?'Tiene que quedar al menos un módulo':'Va unido al rincón: elimina antes el rincón'}"`}>Eliminar módulo</button>`;
+  document.body.append(d);const r=d.getBoundingClientRect();
+  d.style.left=Math.max(8,Math.min(x,innerWidth-r.width-8))+'px';d.style.top=Math.max(8,Math.min(y,innerHeight-r.height-8))+'px';}
+document.addEventListener('contextmenu',e=>{const el=e.target.closest('[data-act="sel"][data-i]');if(!el)return;e.preventDefault();openCtx(e.clientX,e.clientY,+el.dataset.i);});
+document.addEventListener('click',()=>setTimeout(closeCtx));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeCtx();});
+addEventListener('scroll',closeCtx,true);addEventListener('resize',closeCtx);
+
+/* ===================== DESCUENTO ===================== */
+function dtoCalc(prod,rows,tot){const d=state.dto||(state.dto={type:'pct',v:0,scope:'todo'});
+  const base=d.scope==='prod'?bomTotal(prod):tot,v=Math.max(0,+d.v||0);
+  let off=d.type==='pct'?base*Math.min(v,100)/100:Math.min(v,base);off=r2(off);
+  return {tot,base,off,fin:r2(tot-off),d};}
+function renderDto(D){const host=document.getElementById('dto');if(!host)return;const d=D.d;
+  if(!document.getElementById('dtoIn')){host.innerHTML=`<div><h3>Aplicar descuento</h3>
+      <div class="drow">${'<div class="seg" id="dtoType"></div>'}<input id="dtoIn" type="number" min="0" step="0.5" inputmode="decimal" aria-label="Valor del descuento" placeholder="0"></div>
+      <div class="drow"><span class="mini">Se aplica a</span><div class="seg" id="dtoScope"></div></div>
+      <div class="drow"><button class="btn" data-act="dtoclr">Quitar descuento</button></div></div>
+    <div class="dres" id="dtoRes"></div>`;
+    const inp=document.getElementById('dtoIn');inp.value=d.v||'';
+    inp.addEventListener('input',()=>{state.dto.v=Math.max(0,parseFloat(inp.value.replace(',','.'))||0);save();renderSummary();renderSteps&&renderSteps();});}
+  document.getElementById('dtoType').innerHTML=seg('dtotype',[['pct','%'],['eur','€']],d.type).replace(/^<div class="seg">|<\/div>$/g,'');
+  document.getElementById('dtoScope').innerHTML=seg('dtoscope',[['todo','Todo'],['prod','Solo productos']],d.scope).replace(/^<div class="seg">|<\/div>$/g,'');
+  const inp=document.getElementById('dtoIn');if(document.activeElement!==inp)inp.value=d.v||'';
+  const lbl=D.off>0?(d.type==='pct'?`Descuento ${String(Math.min(+d.v,100)).replace('.',',')} %`:'Descuento')+(d.scope==='prod'?' (solo productos)':''):'Descuento';
+  document.getElementById('dtoRes').innerHTML=`<div><span>Subtotal</span><span>${eur.format(D.tot)}</span></div>
+    <div class="${D.off>0?'neg':''}"><span>${lbl}</span><span>${D.off>0?'− '+eur.format(D.off):'—'}</span></div>
+    <div class="fin"><span>Precio final</span><span>${eur.format(D.fin)}</span></div>
+    <small>IVA incluido${D.off>0?` · ahorras ${eur.format(D.off)} (${String(Math.round(D.off/D.tot*1000)/10).replace('.',',')} %)`:''}</small>`;}
+
 function renderSlidebar(){
   const sb=document.getElementById('slidebar'),err=slideCheck();
   document.querySelector('#segAp [data-v="corredera"]').disabled=!!err;
@@ -998,8 +1051,8 @@ function render(){
   document.getElementById('canvas').hidden=is3d;
   document.getElementById('canvas3d').hidden=!is3d;
   document.getElementById('hint').textContent=is3d
-    ?(state.night?'Modo noche: solo se ven las luces LED del armario. Actívalas en el apartado Interior.':'Arrastra para girar y usa la rueda para acercar. Pulsa un módulo para seleccionarlo y vuelve a arrastrarlo para moverlo de sitio.')
-    :'Pulsa un módulo para editarlo y arrástralo para cambiarlo de sitio. Con rincón, el alzado se dibuja desplegado.';
+    ?(state.night?'Modo noche: solo se ven las luces LED del armario. Actívalas en el apartado Interior.':'Arrastra para girar y usa la rueda para acercar. Pulsa un módulo para seleccionarlo y vuelve a arrastrarlo para moverlo de sitio. Clic derecho en un módulo para eliminarlo o duplicarlo.')
+    :'Pulsa un módulo para editarlo y arrástralo para cambiarlo de sitio. Clic derecho para eliminarlo o duplicarlo. Con rincón, el alzado se dibuja desplegado.';
   renderSlidebar();
   if(is3d){if(ensure3D())build3D();}else renderCanvas();
   renderPanel();renderInterior();renderHandles();renderServ();renderSummary();renderStart();renderPaso2();renderShare();renderSteps();renderSubnav();renderTools();save();
@@ -1154,6 +1207,9 @@ function ensure3D(){
   {const R0=runs();camera.position.set(R0.a*.35+(R0.c>=0?90:120),165,300+R0.a*.6+(R0.c>=0?R0.b*.5:0));}controls.target.set(0,95,40);
   let down=null;const ray=new THREE.Raycaster();
   renderer.domElement.addEventListener('pointerdown',e=>down=[e.clientX,e.clientY]);
+  renderer.domElement.addEventListener('contextmenu',e=>{e.preventDefault();if(down&&Math.hypot(e.clientX-down[0],e.clientY-down[1])>5)return;
+    const r=renderer.domElement.getBoundingClientRect();ray.setFromCamera({x:(e.clientX-r.left)/r.width*2-1,y:-(e.clientY-r.top)/r.height*2+1},camera);
+    const hit=ray.intersectObjects(root.children,true).find(h=>h.object.userData.i!==undefined);if(hit)openCtx(e.clientX,e.clientY,hit.object.userData.i);});
   renderer.domElement.addEventListener('pointerup',e=>{
     if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>5)return;
     const r=renderer.domElement.getBoundingClientRect();
@@ -1959,6 +2015,9 @@ document.addEventListener('click',e=>{
     case 'sprof':state.slideProf=v;break;
     case 'open':state.open=!state.open;break;
     case 'night':state.night=!state.night;break;
+    case 'dtotype':state.dto.type=v;break;
+    case 'dtoscope':state.dto.scope=v;break;
+    case 'dtoclr':state.dto.v=0;break;
     case 'deco':state.deco=state.deco===false;break;
     case 'lite':state.lite=!state.lite;applyLite();toast(state.lite?'Bajo consumo activado: menos calidad, más fluido.':'Calidad alta activada.');break;
     case 'add':{const n=newMod({w:m.w===40&&!isR(m)?40:60,h:isR(m)?204.8:m.h,d:m.d,color:m.color,base:m.base,finish:m.finish,items:['balda','barra']});
@@ -2018,7 +2077,7 @@ document.addEventListener('click',e=>{
       if(c>=0){if(+v>0&&to===c)to=c+1;if(+v<0&&to===c+1)to=c;}
       to=Math.max(0,Math.min(state.mods.length-1,to));const [mm]=state.mods.splice(i0,1);state.mods.splice(to,0,mm);state.sel=to;break;}
     case 'dup':{const n=JSON.parse(JSON.stringify(m));n.type='normal';state.mods.splice(state.sel+1,0,n);state.sel++;break;}
-    case 'del':{const wasR=isR(m);state.mods.splice(state.sel,1);state.sel=Math.min(state.sel,state.mods.length-1);state.selItem=-1;break;}
+    case 'del':{const wasR=isR(m),k=state.sel+1;state.mods.splice(state.sel,1);state.sel=Math.min(state.sel,state.mods.length-1);state.selItem=-1;setTimeout(()=>toast(`Módulo ${k} eliminado.`,'Deshacer',undo));break;}
     default:return;
   }
   if(a==='iadd'&&v==='cajon_ext'&&!isR(m)&&m.finish!=='none'&&state.apertura!=='corredera'&&doorPlan(m).open)setTimeout(()=>toast('Con estos cajones la puerta no encaja. Te propongo soluciones en el apartado Interior.'),50);
