@@ -427,7 +427,7 @@ const P={mod:{38.4:{40:32,60:38,80:45},102.4:{60:62,80:72},204.8:{40:85,60:99,80
   led:{techo:{40:35,60:42,80:49},lat:{38.4:20,102.4:30,204.8:45,230.4:50},bar:{40:29,60:35,80:42}},profiles:{2:39,3:55}};
 const BW={40:'36,8',60:'56,8',80:'76,8'}, SD={28:26,38:36,54:52}, IFW={40:33.8,60:53.8,80:73.8}, EFW={60:55.2,80:75.2};
 const ITEMS_={
-  barra:{name:'Barra de armario',short:'Barra',g:'Colgar',h:90,flex:1,dim:m=>`${BW[m.w]} cm · negro`,p:m=>({40:8.95,60:10.95,80:12.95})[m.w],ok:()=>1,tip:'Deja unos 90 cm para camisas y 130 cm para vestidos y abrigos.'},
+  barra:{name:'Barra de armario',short:'Barra',g:'Colgar',h:9.6,flex:1,dim:m=>`${BW[m.w]} cm · negro`,p:m=>({40:8.95,60:10.95,80:12.95})[m.w],ok:()=>1,tip:'Deja unos 90 cm para camisas y 130 cm para vestidos y abrigos.'},
   abatible:{name:'Barra abatible',short:'Abatible',g:'Colgar',h:90,flex:1,dim:()=>'84 × 56,8–76,8 × 14 cm',p:()=>49.95,ok:m=>m.w>=60&&m.h>=204.8,why:'Solo 60/80 y alto 204,8+',tip:'Va en el centro del módulo con plantilla; en el de 60 hay que cortar la barra.'},
   pantalonero:{name:'Colgador de pantalones deslizante',short:'Pantalonero',g:'Colgar',h:80,dim:m=>`${BW[m.w]} × 48 cm`,p:m=>m.w===80?44.95:39.95,ok:m=>m.w>=60&&m.d===54,why:'Solo 60/80 y fondo 54',tip:'Deja 70 cm libres debajo. En el de 80 pon una balda encima.'},
   perchero:{name:'Perchero deslizante',short:'Perchero',g:'Colgar',h:35,dim:()=>'4,24 × 48 × 8 cm',p:()=>12.95,ok:m=>m.d===54,why:'Solo fondo 54'},
@@ -453,7 +453,7 @@ const cm=n=>String(Math.round(n*10)/10).replace('.',',');
 const isR=m=>m.type==='rincon';
 
 /* ===================== ESTADO ===================== */
-const newMod=o=>Object.assign({type:'normal',w:60,h:204.8,d:54,color:'blanco',base:'zocalo',finish:'riga_blanca',dfin:'riga_blanca',ifront:'blanco',split:false,panels:{},leds:{},items:['balda','barra']},o);
+const newMod=o=>Object.assign({bv:2,type:'normal',w:60,h:204.8,d:54,color:'blanco',base:'zocalo',finish:'riga_blanca',dfin:'riga_blanca',ifront:'blanco',split:false,panels:{},leds:{},items:['balda','barra']},o);
 let state={step:0,room:{on:false,w:240,h:250,lw:150},apertura:'abatible',slideFin:'riga_blanca',slideProf:'blanco',handle:{model:'nino',fin:'negro'},legFin:'negro',view:'3d',sel:1,selItem:-1,mods:[
   newMod({type:'rincon',w:40,color:'roble',finish:'riga_blanca',items:['balda','barra','balda']}),
   newMod({w:80,color:'roble',finish:'riga_blanca',leds:{barra:true},items:['cesta_comp','cesta_comp','balda','barra']}),
@@ -499,6 +499,8 @@ function fixItems(m){m.items=m.items.filter(t=>allowed(m,t));norm(m);while(used(
 function zones(m){
   const left=Math.max(0,avail(m)-used(m)),nf=custom(m)?0:m.items.filter(t=>ITEMS[t].flex).length,ext=nf?Math.floor(left/nf/3.2)*3.2:0;let y=0;
   const z=m.items.map((t,k)=>{const h=hOf(m,t)+(ITEMS[t].flex?ext:0),r={t,k,y0:y,y1:y+h};y=r.y1;return r;});
+  /* la ropa de la barra cuelga por el hueco libre que tenga debajo */
+  z.forEach((q,j)=>{if(q.t!=='barra')return;let hy=q.y0;for(let b=j-1;b>=0&&isSp(z[b].t);b--)hy=z[b].y0;q.hy0=hy;});
   return {z,free:avail(m)-y};
 }
 /* puertas abatibles: pila de puertas de altura estándar por encima de los cajones exteriores */
@@ -534,7 +536,7 @@ function normAll(){
   if(c>=0){const r=ms[c];r.w=40;r.d=54;if(r.h<204.8)r.h=204.8;r.base='zocalo';
     let n=ms[c+1];if(!n){n=newMod({color:r.color});ms.splice(c+1,0,n);}
     Object.assign(n,{type:'normal',w:80,h:r.h,d:54,base:'zocalo'});}
-  ms.forEach(m=>{m.panels=m.panels||{};m.leds=m.leds||{};m.dfin=m.dfin||'riga_blanca';m.ifront=m.ifront||'blanco';
+  ms.forEach(m=>{if(!m.bv){if(custom(m))m.items=m.items.flatMap(t=>t==='barra'?['esp:80.4','barra']:[t]);m.bv=2;}m.panels=m.panels||{};m.leds=m.leds||{};m.dfin=m.dfin||'riga_blanca';m.ifront=m.ifront||'blanco';
     if(!isR(m)&&!modOK(m.w,m.h,m.d))setDim(m,'h',m.h);
     if(m.h<204.8&&m.base==='zocalo')m.base='suelo';
     if(m.d===28&&!m.items.length)m.items=['balda','balda','balda','balda'];
@@ -755,7 +757,7 @@ function faceSVG(m,x,i,view){
   if(zh)s+=R(x+T,H-zh,w-2*T,zh,'rgba(0,0,0,.28)');
   s+=R(x+T,H-zh-T,w-2*T,T,fill,STROKE)+ledSVG(m,x+T,w-2*T,ih);
   const {z}=zones(m),dp=doorPlan(m);
-  z.forEach(q=>{if(q.t!=='cajon_ext'||view!=='puertas')s+=item2D(q.t,x+T,w-2*T,base-q.y1,base-q.y0,m,x,w,(m.leds||{}).barra);});
+  z.forEach(q=>{if(q.t!=='cajon_ext'||view!=='puertas')s+=item2D(q.t,x+T,w-2*T,base-q.y1,base-(q.hy0??q.y0),m,x,w,(m.leds||{}).barra);});
   if(view==='puertas'){
     if(dp.slide){}
     else dp.stack.forEach(st=>{const yt=H-st.y-st.h-.15;
@@ -949,7 +951,7 @@ function renderInterior(){
   const H=m.h,w=m.w,zh=zH(m),base=H-zh-T,inner=m.color==='roble'?'#a98257':'#d9d7d1';
   let el=R(0,0,w,H,colFill(m.color),STROKE)+R(T,T,w-2*T,H-zh-2*T,inner)+(zh?R(T,H-zh,w-2*T,zh,'rgba(0,0,0,.28)'):'')+R(T,H-zh-T,w-2*T,T,colFill(m.color),STROKE)+ledSVG(m,T,w-2*T,H-zh-2*T);
   z.forEach(q=>{const top=base-q.y1,bot=base-q.y0,on=q.k===state.selItem;
-    el+=q.t==='cajon_ext'?item2D('cajon_ext',T,w-2*T,top,bot,m,0,w):item2D(q.t,T,w-2*T,top,bot,m,0,w,(m.leds||{}).barra);
+    el+=q.t==='cajon_ext'?item2D('cajon_ext',T,w-2*T,top,bot,m,0,w):item2D(q.t,T,w-2*T,top,base-(q.hy0??q.y0),m,0,w,(m.leds||{}).barra);
     el+=`<g class="zone" data-act="isel" data-v="${q.k}">${R(T,Math.min(top,bot-6),w-2*T,Math.max(bot-top,6),on?'rgba(63,125,22,.2)':'rgba(0,0,0,0)',on?'style="stroke:var(--accent)" stroke-width=".7"':'')}</g>`;
     el+=`<line x1="${w+1}" y1="${top}" x2="${w+4}" y2="${top}" style="stroke:var(--muted)" stroke-width=".25"/>`+
         `<text x="${w+5}" y="${(top+bot)/2+1.2}" style="fill:${on?'var(--accent)':'var(--muted)'};font:${on?700:500} 4.4px 'Barlow',sans-serif">${ITEMS[q.t].short} · a ${cm(q.y0)}</text>`;});
@@ -1314,7 +1316,7 @@ function led3D(g,m,x0,w,D,H,y0){
 function interior3D(g,m,i){
   const H=m.h,D=m.d,w=m.w,fm=M[m.color],iw=w-2*T,cx=w/2,y00=zH(m)+T;
   const add=(...a)=>box3(...a,i,g);
-  zones(m).z.forEach((q,qi)=>{const y0=y00+q.y0,y1=y00+q.y1,h=y1-y0;
+  zones(m).z.forEach((q,qi)=>{const y0=y00+q.y0,y1=y00+q.y1,h=y1-(y00+(q.hy0??q.y0));
     switch(q.t){
       case 'balda':add(iw,T,SD[m.d],cx,y0+T/2,SD[m.d]/2+1,fm);break;
       case 'refuerzo':add(Math.min(74.5,iw),2,1.6,cx,y1-3,D-4,M.black);break;
@@ -1829,7 +1831,7 @@ function insertAtY(m,t,Y){
   const list=layoutAbs(m),mv={t,y0:0,h:t==='balda'?3.2:ITEMS[t].h,k:-1};list.push(mv);
   if(!solveAt(m,list,mv,Y)){toast('No cabe ahí: prueba en otra altura.');render();return;}
   state.selItem=rebuildFrom(m,list,mv);
-  if(!itemsValid(m)){applyDesign(JSON.parse(b));toast('El cajón interior no puede quedar abajo del todo: pon antes una cesta o una balda.');render();return;}
+  if(!itemsValid(m)){m.items.splice(nExt(m),0,'balda');if(!itemsValid(m)||used(m)>avail(m)+.01){applyDesign(JSON.parse(b));toast('No queda sitio para el cajón y la balda que lleva debajo.');render();return;}state.selItem++;}
   trackUndo(b);render();toast(`${ITEMS[t].name} añadido a ${cm(layoutAbs(m).find(o=>o.k===state.selItem)?.y0??Y)} cm.`,'Deshacer',undo);}
 function removeAt(m,k){const b=JSON.stringify(pickDesign());const list=layoutAbs(m).filter(o=>o.k!==k);
   if(m.items[k]==='cajon_ext'){m.items.splice(k,1);}else rebuildFrom(m,list,null);norm(m);state.selItem=-1;trackUndo(b);render();}
@@ -1947,8 +1949,8 @@ function moveItem(from,to){const m=state.mods[state.sel],b=JSON.stringify(pickDe
   state.selItem=m.items.indexOf(t);trackUndo(b);render();}
 function insertItem(t,to){const m=state.mods[state.sel];if(!fits(m,t)){toast(allowed(m,t)?'No cabe: quita algún elemento.':(ITEMS[t].why||'No disponible en este módulo.'));return;}
   const b=JSON.stringify(pickDesign()),snap=JSON.stringify(m.items);m.items.splice(Math.min(to,m.items.length),0,t);norm(m);
-  if(!itemsValid(m)){m.items=JSON.parse(snap);toast('El cajón interior no puede ir abajo del todo: pon antes una cesta o una balda.');render();return;}
-  state.selItem=m.items.lastIndexOf(t);trackUndo(b);render();toast(`${ITEMS[t].name} añadido.`,'Deshacer',undo);}
+  let bal=false;if(!itemsValid(m)){m.items.splice(nExt(m),0,'balda');bal=true;if(!itemsValid(m)||used(m)>avail(m)+.01){m.items=JSON.parse(snap);toast('No queda sitio para el cajón y la balda que lleva debajo.');render();return;}}
+  state.selItem=m.items.lastIndexOf(t);if(bal)setTimeout(()=>toast('Cajón añadido sobre una balda (no puede ir apoyado abajo del todo).','Deshacer',undo));trackUndo(b);render();toast(`${ITEMS[t].name} añadido.`,'Deshacer',undo);}
 /* catálogo arrastrable al alzado */
 let DRAGT=null;document.addEventListener('dragstart',e=>{const b=e.target.closest&&e.target.closest('.pitem');if(!b||b.disabled)return;DRAGT=b.dataset.v;e.dataTransfer.setData('text/plain',b.dataset.v);e.dataTransfer.effectAllowed='copy';});
 document.addEventListener('dragover',e=>{const s=e.target.closest&&e.target.closest('#interior .elev svg');if(!s)return;e.preventDefault();e.dataTransfer.dropEffect='copy';const t=DRAGT||e.dataTransfer.getData('text/plain');const h=t==='balda'?3.2:ITEMS[t]?ITEMS[t].h:20;showGhost(s,zoneY(svgPt(s,e).y,h),h);});
